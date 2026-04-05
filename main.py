@@ -1,9 +1,10 @@
 """
-hold.escrow — Main FastAPI App v2
+hold.escrow - Main FastAPI App v2
 Discord OAuth2 + bot notifications integrated.
 """
 
 import os, uuid, json, hashlib, hmac, asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
@@ -16,17 +17,6 @@ from escrow import EscrowService
 from database import db
 from discord_auth import router as discord_auth_router
 
-app = FastAPI(title="HalalMM Escrow API", version="2.0.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-app.include_router(discord_auth_router)
-
-# Serve frontend static files
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-if os.path.isdir(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-wallet_svc = WalletService()
-escrow_svc = EscrowService(wallet_svc)
 _bot_module = None
 
 def _get_bot():
@@ -39,6 +29,24 @@ def _get_bot():
             pass
     return _bot_module
 
+@asynccontextmanager
+async def lifespan(app):
+    bot = _get_bot()
+    if bot and os.getenv("DISCORD_BOT_TOKEN"):
+        asyncio.create_task(bot.start_bot())
+    yield
+
+app = FastAPI(title="HalalMM Escrow API", version="2.0.0", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(discord_auth_router)
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+wallet_svc = WalletService()
+escrow_svc = EscrowService(wallet_svc)
+
 async def _notify(event: str, deal: dict):
     bot = _get_bot()
     if not bot:
@@ -50,15 +58,6 @@ async def _notify(event: str, deal: dict):
             asyncio.create_task(handlers[event](deal))
     except Exception as e:
         print(f"[NOTIFY] {event} failed: {e}")
-
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app):
-    bot = _get_bot()
-    if bot and os.getenv("DISCORD_BOT_TOKEN"):
-        asyncio.create_task(bot.start_bot())
-    yield
 
 class CreateDealRequest(BaseModel):
     title: str
@@ -145,7 +144,7 @@ async def release_funds(req: ReleaseFundsRequest):
     if not deal:
         raise HTTPException(404, "Deal not found")
     if deal["status"] not in ["FUNDED", "IN_PROGRESS"]:
-        raise HTTPException(400, f"Cannot release — status is {deal['status']}")
+        raise HTTPException(400, f"Cannot release - status is {deal['status']}")
     if req.initiator_email != deal["buyer_email"]:
         raise HTTPException(403, "Only the buyer can release funds")
     seller = db.get_user(deal["seller_email"])
@@ -202,8 +201,6 @@ async def root():
         return FileResponse(index)
     return {"service": "HalalMM Escrow", "version": "2.0.0", "docs": "/docs"}
 
-
-# ── Catch-all: serve frontend for any unknown route (SPA support) ─────────────
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
     index = os.path.join(STATIC_DIR, "index.html")
