@@ -16,7 +16,7 @@ from escrow import EscrowService
 from database import db
 from discord_auth import router as discord_auth_router
 
-app = FastAPI(title="HalalMM Escrow API", version="2.0.0")
+app = FastAPI(title="HalalMM Escrow API", version="2.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(discord_auth_router)
 
@@ -51,11 +51,14 @@ async def _notify(event: str, deal: dict):
     except Exception as e:
         print(f"[NOTIFY] {event} failed: {e}")
 
-@app.on_event("startup")
-async def startup():
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app):
     bot = _get_bot()
     if bot and os.getenv("DISCORD_BOT_TOKEN"):
         asyncio.create_task(bot.start_bot())
+    yield
 
 class CreateDealRequest(BaseModel):
     title: str
