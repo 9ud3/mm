@@ -514,10 +514,12 @@ window.addEventListener('DOMContentLoaded', () => {
   if (savedToken) {
     currentToken = savedToken;
     fetchMe();
+    showPage('dashboard');
+    setNav(document.getElementById('nav-dashboard'));
+    loadDashboard();
+  } else if (!token) {
+    window.location.href = '/landing.html';
   }
-  showPage('dashboard');
-  setNav(document.getElementById('nav-dashboard'));
-  loadDashboard();
 });
 
 // ═══════════════════ AUTH ═══════════════════
