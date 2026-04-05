@@ -1,5 +1,5 @@
 """
-database.py — Storage layer (JSON for dev, swap for PostgreSQL in production)
+database.py - Storage layer (JSON for dev, swap for PostgreSQL in production)
 Now includes Discord ID indexing and per-user deal statistics.
 """
 
