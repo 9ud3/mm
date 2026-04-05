@@ -1,18 +1,12 @@
 """
-discord_auth.py — Discord OAuth2 Login
-Flow:
-  1. Frontend redirects user to /auth/discord
-  2. Discord redirects back to /auth/discord/callback?code=...
-  3. We exchange code for access token, fetch user profile
-  4. Save discord_id + username to DB, issue our own session token
-  5. All deals created by this user are tagged with their discord_id
+discord_auth.py - Discord OAuth2 Login
+Automatically adds users to the Discord server on login.
 """
 
 import os
 import time
 import hmac
 import hashlib
-import json
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import RedirectResponse
@@ -24,19 +18,18 @@ DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID", "")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET", "")
 DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/auth/discord/callback")
 SESSION_SECRET        = os.getenv("SESSION_SECRET", "change-me-in-production")
+DISCORD_BOT_TOKEN     = os.getenv("DISCORD_BOT_TOKEN", "")
+DISCORD_GUILD_ID      = os.getenv("DISCORD_GUILD_ID", "")
 
 DISCORD_API   = "https://discord.com/api/v10"
 DISCORD_OAUTH = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN = "https://discord.com/api/oauth2/token"
 
-SCOPES = "identify email"
+SCOPES = "identify email guilds.join"
 
-
-# ─── Step 1: Redirect user to Discord login ───────────────────────────────────
 
 @router.get("/discord")
 async def discord_login():
-    """Redirect browser to Discord OAuth consent screen."""
     url = (
         f"{DISCORD_OAUTH}"
         f"?client_id={DISCORD_CLIENT_ID}"
@@ -47,16 +40,10 @@ async def discord_login():
     return RedirectResponse(url)
 
 
-# ─── Step 2: Handle callback from Discord ────────────────────────────────────
-
 @router.get("/discord/callback")
 async def discord_callback(code: str = Query(...)):
-    """
-    Discord redirects here with ?code=...
-    Exchange code → access token → fetch user profile → save to DB → issue session.
-    """
-    # Exchange authorization code for access token
     async with httpx.AsyncClient() as client:
+        # Exchange code for token
         token_resp = await client.post(
             DISCORD_TOKEN,
             data={
@@ -75,7 +62,7 @@ async def discord_callback(code: str = Query(...)):
         token_data = token_resp.json()
         access_token = token_data["access_token"]
 
-        # Fetch the user's Discord profile
+        # Fetch user profile
         user_resp = await client.get(
             f"{DISCORD_API}/users/@me",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -85,19 +72,33 @@ async def discord_callback(code: str = Query(...)):
             raise HTTPException(400, "Failed to fetch Discord user profile")
 
         discord_user = user_resp.json()
+        discord_id       = discord_user["id"]
+        discord_username = discord_user["username"]
+        discord_avatar   = discord_user.get("avatar")
+        discord_email    = discord_user.get("email", "")
 
-    discord_id       = discord_user["id"]
-    discord_username = discord_user["username"]
-    discord_avatar   = discord_user.get("avatar")
-    discord_email    = discord_user.get("email", "")
+        avatar_url = (
+            f"https://cdn.discordapp.com/avatars/{discord_id}/{discord_avatar}.png"
+            if discord_avatar else
+            f"https://cdn.discordapp.com/embed/avatars/{int(discord_id) % 5}.png"
+        )
 
-    avatar_url = (
-        f"https://cdn.discordapp.com/avatars/{discord_id}/{discord_avatar}.png"
-        if discord_avatar else
-        f"https://cdn.discordapp.com/embed/avatars/{int(discord_id) % 5}.png"
-    )
+        # Auto-add user to Discord server
+        if DISCORD_GUILD_ID and DISCORD_BOT_TOKEN:
+            try:
+                await client.put(
+                    f"{DISCORD_API}/guilds/{DISCORD_GUILD_ID}/members/{discord_id}",
+                    headers={
+                        "Authorization": f"Bot {DISCORD_BOT_TOKEN}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"access_token": access_token},
+                )
+                print(f"[AUTH] Added {discord_username} to guild {DISCORD_GUILD_ID}")
+            except Exception as e:
+                print(f"[AUTH] Failed to add user to guild: {e}")
 
-    # Save or update user in DB
+    # Save user to DB
     existing = db.get_user_by_discord_id(discord_id)
     user_record = {
         "discord_id":       discord_id,
@@ -111,24 +112,15 @@ async def discord_callback(code: str = Query(...)):
     }
     db.save_user_by_discord_id(discord_id, user_record)
 
-    # Issue a simple signed session token
     session_token = _sign_session(discord_id)
-
-    # Redirect to frontend dashboard with token
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     return RedirectResponse(
         f"{frontend_url}/dashboard?token={session_token}&discord_id={discord_id}&username={discord_username}"
     )
 
 
-# ─── Get current user profile + deal stats ───────────────────────────────────
-
 @router.get("/me")
 async def get_me(token: str = Query(...)):
-    """
-    Returns the logged-in user's profile + deal statistics.
-    Pass ?token=<session_token>
-    """
     discord_id = _verify_session(token)
     if not discord_id:
         raise HTTPException(401, "Invalid or expired session token")
@@ -137,16 +129,15 @@ async def get_me(token: str = Query(...)):
     if not user:
         raise HTTPException(404, "User not found")
 
-    # Pull deal stats for this discord_id
     stats = db.get_user_deal_stats(discord_id)
 
     return {
-        "discord_id":       user["discord_id"],
-        "username":         user["discord_username"],
-        "avatar":           user["discord_avatar"],
-        "email":            user.get("email"),
-        "payout_address":   user.get("payout_address"),
-        "joined_at":        user.get("joined_at"),
+        "discord_id":     user["discord_id"],
+        "username":       user["discord_username"],
+        "avatar":         user["discord_avatar"],
+        "email":          user.get("email"),
+        "payout_address": user.get("payout_address"),
+        "joined_at":      user.get("joined_at"),
         "stats": {
             "total_deals":      stats["total"],
             "completed_deals":  stats["completed"],
@@ -158,10 +149,7 @@ async def get_me(token: str = Query(...)):
     }
 
 
-# ─── Session token (simple HMAC — swap for JWT in production) ─────────────────
-
 def _sign_session(discord_id: str) -> str:
-    """Create a signed token: discord_id:timestamp:hmac"""
     ts      = str(int(time.time()))
     payload = f"{discord_id}:{ts}"
     sig     = hmac.new(SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
@@ -169,14 +157,12 @@ def _sign_session(discord_id: str) -> str:
 
 
 def _verify_session(token: str) -> str | None:
-    """Verify and return discord_id, or None if invalid/expired."""
     try:
         parts = token.split(":")
         if len(parts) != 3:
             return None
         discord_id, ts, sig = parts
-        age = int(time.time()) - int(ts)
-        if age > 60 * 60 * 24 * 30:  # 30-day expiry
+        if int(time.time()) - int(ts) > 60 * 60 * 24 * 30:
             return None
         payload  = f"{discord_id}:{ts}"
         expected = hmac.new(SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
