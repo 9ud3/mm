@@ -640,8 +640,8 @@ function renderChart() {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const now = new Date();
   const labels = Array.from({length:6}, (_,i) => months[(now.getMonth()-5+i+12)%12]);
-  const completed = labels.map(()=>Math.floor(Math.random()*30)+5);
-  const disputed  = labels.map(()=>Math.floor(Math.random()*3));
+  const completed = labels.map(label => allDeals.filter(d => d.status === "RELEASED" && d.released_at && months[new Date(d.released_at).getMonth()] === label).length);
+  const disputed = labels.map(label => allDeals.filter(d => d.status === "DISPUTED" && d.disputed_at && months[new Date(d.disputed_at).getMonth()] === label).length);
 
   chart = new Chart(ctx, {
     type: 'line',
