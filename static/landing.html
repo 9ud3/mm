@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FedMM — Crypto Middleman</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080808;--surface:#0f0f0f;--surface2:#161616;--border:#1f1f1f;--border2:#2a2a2a;
+  --green:#00ff88;--green-dim:rgba(0,255,136,.08);--green-glow:rgba(0,255,136,.15);
+  --text:#f5f5f5;--muted:#666;--muted2:#444;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--muted2)}
+
+/* GRID PATTERN */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,255,136,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.03) 1px,transparent 1px);
+  background-size:60px 60px;pointer-events:none;z-index:0
+}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 48px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(8,8,8,.85);backdrop-filter:blur(20px)}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-mark{width:32px;height:32px;border:1.5px solid var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--green)}
+.logo-text{font-size:17px;font-weight:600;color:var(--text);letter-spacing:-.02em}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{color:var(--muted);font-size:14px;text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{display:flex;gap:10px}
+.btn-outline{padding:8px 20px;border:1px solid var(--border2);background:none;color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:500;border-radius:6px;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-outline:hover{border-color:var(--green);color:var(--green)}
+.btn-green{padding:8px 20px;border:none;background:var(--green);color:#000;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;border-radius:6px;cursor:pointer;transition:all .2s;text-decoration:none}
+.btn-green:hover{background:#00e67a;transform:translateY(-1px)}
+
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:0 48px;z-index:1}
+.hero-content{max-width:620px}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:var(--green-dim);border:1px solid rgba(0,255,136,.2);color:var(--green);font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;padding:6px 14px;border-radius:100px;margin-bottom:32px;font-family:'JetBrains Mono',monospace}
+.badge-dot{width:6px;height:6px;background:var(--green);border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hero h1{font-size:64px;font-weight:700;line-height:1.04;letter-spacing:-.04em;margin-bottom:24px}
+.hero h1 .accent{color:var(--green)}
+.hero p{font-size:18px;color:var(--muted);line-height:1.65;margin-bottom:40px;font-weight:300;max-width:480px}
+.hero-ctas{display:flex;gap:12px;align-items:center}
+.btn-hero{padding:14px 32px;font-size:15px;font-weight:600;border-radius:8px;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn-hero.primary{background:var(--green);color:#000;border:none}
+.btn-hero.primary:hover{background:#00e67a;transform:translateY(-2px)}
+.btn-hero.secondary{background:none;color:var(--muted);border:1px solid var(--border2)}
+.btn-hero.secondary:hover{border-color:var(--muted);color:var(--text)}
+.hero-right{position:absolute;right:0;top:50%;transform:translateY(-50%);width:52%;max-width:720px;padding:0 48px}
+
+/* LIVE FEED */
+.live-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.live-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.live-title{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.live-dot{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green);font-family:'JetBrains Mono',monospace}
+.live-dot::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%;animation:blink 1.5s infinite}
+.feed-item{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);font-size:13px;animation:slideIn .4s ease}
+@keyframes slideIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+.feed-item:last-child{border-bottom:none}
+.feed-left{display:flex;align-items:center;gap:12px}
+.feed-icon{width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.feed-name{font-weight:500;color:var(--text)}
+.feed-meta{font-size:11px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace}
+.feed-amount{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px}
+.feed-amount.green{color:var(--green)}
+.feed-amount.blue{color:#60a5fa}
+.status-tag{font-size:10px;font-weight:600;padding:3px 8px;border-radius:100px;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
+.st-funded{background:rgba(0,255,136,.1);color:var(--green)}
+.st-pending{background:rgba(251,191,36,.1);color:#fbbf24}
+.st-done{background:rgba(96,165,250,.1);color:#60a5fa}
+
+/* STATS TICKER */
+.stats-bar{position:relative;z-index:1;padding:28px 48px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface);display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.stat-item{padding:0 40px;border-right:1px solid var(--border);text-align:center}
+.stat-item:last-child{border-right:none}
+.stat-num{font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:500;color:var(--green);letter-spacing:-.02em}
+.stat-label{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.04em;text-transform:uppercase}
+
+/* FEATURES */
+.section{position:relative;z-index:1;padding:100px 48px}
+.section-tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);letter-spacing:.12em;text-transform:uppercase;margin-bottom:16px}
+.section-title{font-size:42px;font-weight:700;letter-spacing:-.03em;margin-bottom:12px;line-height:1.1}
+.section-sub{color:var(--muted);font-size:16px;font-weight:300;margin-bottom:60px;max-width:520px}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.feature{background:var(--bg);padding:36px 32px;transition:background .2s}
+.feature:hover{background:var(--surface)}
+.feature-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted2);letter-spacing:.1em;margin-bottom:20px}
+.feature-icon{width:40px;height:40px;border:1px solid var(--border2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:20px;background:var(--surface2)}
+.feature h3{font-size:16px;font-weight:600;margin-bottom:10px;letter-spacing:-.01em}
+.feature p{color:var(--muted);font-size:13px;line-height:1.65;font-weight:300}
+
+/* HOW IT WORKS */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:60px}
+.step{position:relative;padding:28px 24px;background:var(--surface);border:1px solid var(--border);border-radius:14px}
+.step::after{content:'→';position:absolute;right:-18px;top:34px;color:var(--muted2);font-size:20px;z-index:2}
+.step:last-child::after{display:none}
+.step-num{width:36px;height:36px;border:1px solid var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--green);margin-bottom:18px}
+.step h4{font-size:14px;font-weight:600;margin-bottom:8px}
+.step p{font-size:13px;color:var(--muted);line-height:1.6;font-weight:300}
+
+/* CURRENCIES */
+.currencies{display:flex;gap:12px;flex-wrap:wrap;margin-top:48px}
+.currency-pill{display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface);border:1px solid var(--border);border-radius:100px;font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:500;transition:all .2s;cursor:default}
+.currency-pill:hover{border-color:var(--green);color:var(--green)}
+
+/* CTA */
+.cta-section{position:relative;z-index:1;padding:80px 48px;text-align:center}
+.cta-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:80px 48px;max-width:720px;margin:0 auto;position:relative;overflow:hidden}
+.cta-box::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:400px;height:400px;background:radial-gradient(circle,var(--green-glow) 0%,transparent 70%);pointer-events:none}
+.cta-box h2{font-size:44px;font-weight:700;letter-spacing:-.03em;margin-bottom:16px;position:relative}
+.cta-box p{color:var(--muted);font-size:16px;font-weight:300;margin-bottom:36px;position:relative}
+.cta-box .btn-hero{position:relative}
+
+/* FOOTER */
+footer{position:relative;z-index:1;padding:32px 48px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.footer-logo{font-size:15px;font-weight:600;letter-spacing:-.02em}
+.footer-logo span{color:var(--green)}
+footer p{font-size:12px;color:var(--muted2)}
+
+/* SCROLL ANIMATIONS */
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-mark">F</div>
+    <span class="logo-text">FedMM</span>
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#currencies">Currencies</a>
+  </div>
+  <div class="nav-cta">
+    <a href="/dashboard" class="btn-outline">Login</a>
+    <a href="/dashboard" class="btn-green">Start a Deal</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="badge-dot"></span>
+      Live · Secure · On-chain
+    </div>
+    <h1>Crypto middleman<br/>you can <span class="accent">trust.</span></h1>
+    <p>FedMM holds funds in escrow until both parties are satisfied. Fully automated, fully on-chain — no middleman drama.</p>
+    <div class="hero-ctas">
+      <a href="/dashboard" class="btn-hero primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        New Deal
+      </a>
+      <a href="#how" class="btn-hero secondary">How it works →</a>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div class="live-panel">
+      <div class="live-header">
+        <span class="live-title">Recent activity</span>
+        <span class="live-dot">LIVE</span>
+      </div>
+      <div class="feed-item">
+        <div class="feed-left">
+          <div class="feed-icon">🔒</div>
+          <div>
+            <div class="feed-name">Roblox Account Trade</div>
+            <div class="feed-meta">ESC-3FA2 · 2 min ago</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="feed-amount green">0.028 ETH</div>
+          <div class="status-tag st-funded" style="margin-top:4px">FUNDED</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-left">
+          <div class="feed-icon">⚡</div>
+          <div>
+            <div class="feed-name">Discord Nitro Resell</div>
+            <div class="feed-meta">ESC-7B1C · 11 min ago</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="feed-amount" style="color:#fbbf24">45 USDT</div>
+          <div class="status-tag st-pending" style="margin-top:4px">PENDING</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-left">
+          <div class="feed-icon">✅</div>
+          <div>
+            <div class="feed-name">Steam Account Sale</div>
+            <div class="feed-meta">ESC-AA44 · 38 min ago</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="feed-amount blue">120 USDC</div>
+          <div class="status-tag st-done" style="margin-top:4px">RELEASED</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-left">
+          <div class="feed-icon">🔒</div>
+          <div>
+            <div class="feed-name">GPU Rental Deal</div>
+            <div class="feed-meta">ESC-9D3E · 1hr ago</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="feed-amount green">0.004 BTC</div>
+          <div class="status-tag st-funded" style="margin-top:4px">FUNDED</div>
+        </div>
+      </div>
+      <div class="feed-item">
+        <div class="feed-left">
+          <div class="feed-icon">✅</div>
+          <div>
+            <div class="feed-name">Minecraft Account</div>
+            <div class="feed-meta">ESC-C21F · 2hr ago</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="feed-amount blue">30 USDT</div>
+          <div class="status-tag st-done" style="margin-top:4px">RELEASED</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar reveal">
+  <div class="stat-item">
+    <div class="stat-num" id="s1">0</div>
+    <div class="stat-label">Deals Completed</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num" id="s2">$0</div>
+    <div class="stat-label">Total Volume</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">5</div>
+    <div class="stat-label">Currencies Supported</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">0%</div>
+    <div class="stat-label">Disputes Unresolved</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="reveal">
+    <div class="section-tag">Why FedMM</div>
+    <div class="section-title">Built for P2P<br/>crypto trades.</div>
+    <div class="section-sub">Everything you need to trade safely with strangers online.</div>
+  </div>
+  <div class="features-grid reveal">
+    <div class="feature">
+      <div class="feature-num">01</div>
+      <div class="feature-icon">🔒</div>
+      <h3>Funds in Escrow</h3>
+      <p>Crypto is locked in a dedicated on-chain wallet until both parties confirm. No one can run.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-num">02</div>
+      <div class="feature-icon">🤝</div>
+      <h3>Buyer Controls Release</h3>
+      <p>Only the buyer triggers the payout. Seller gets paid instantly on-chain the moment they do.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-num">03</div>
+      <div class="feature-icon">⚡</div>
+      <h3>Instant Settlement</h3>
+      <p>No waiting. Funds move on-chain the moment the deal is confirmed by both sides.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-num">04</div>
+      <div class="feature-icon">💬</div>
+      <h3>Discord Native</h3>
+      <p>Login with Discord, get DM alerts on every deal event, check deals via slash commands.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-num">05</div>
+      <div class="feature-icon">⚖️</div>
+      <h3>Dispute System</h3>
+      <p>Either party can raise a dispute. Funds freeze and a mediator reviews within 24–48h.</p>
+    </div>
+    <div class="feature">
+      <div class="feature-num">06</div>
+      <div class="feature-icon">🔍</div>
+      <h3>Full Transparency</h3>
+      <p>Every deal has on-chain TX hashes. You can verify every deposit and release independently.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" id="how" style="padding-top:0">
+  <div class="reveal">
+    <div class="section-tag">Process</div>
+    <div class="section-title">4 steps, that's it.</div>
+    <div class="section-sub">No accounts to create beyond Discord. No KYC. Just deals.</div>
+  </div>
+  <div class="steps reveal">
+    <div class="step">
+      <div class="step-num">01</div>
+      <h4>Create a Deal</h4>
+      <p>Set the amount, currency, release condition and add both parties.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <h4>Buyer Deposits</h4>
+      <p>Buyer sends crypto to the auto-generated escrow wallet address.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <h4>Deliver the Goods</h4>
+      <p>Seller delivers. Buyer inspects within the agreed inspection period.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <h4>Funds Released</h4>
+      <p>Buyer approves and funds are sent to the seller's wallet instantly.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CURRENCIES -->
+<section class="section" id="currencies" style="padding-top:0">
+  <div class="reveal">
+    <div class="section-tag">Supported</div>
+    <div class="section-title">Multi-currency<br/>from day one.</div>
+    <div class="section-sub">All major crypto assets supported. More being added.</div>
+    <div class="currencies">
+      <div class="currency-pill">₿ Bitcoin</div>
+      <div class="currency-pill">Ξ Ethereum</div>
+      <div class="currency-pill">Ł Litecoin</div>
+      <div class="currency-pill">₮ Tether USDT</div>
+      <div class="currency-pill">◎ USD Coin</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section reveal">
+  <div class="cta-box">
+    <h2>Ready to trade <span style="color:var(--green)">safely?</span></h2>
+    <p>Join FedMM and never get scammed on a crypto trade again.</p>
+    <a href="/dashboard" class="btn-hero primary" style="font-size:15px;padding:16px 40px">
+      Start your first deal →
+    </a>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-logo">Fed<span>MM</span></div>
+  <p>© 2025 FedMM · Automated Crypto Escrow</p>
+  <p style="font-size:12px;color:var(--muted2)">Built for the community</p>
+</footer>
+
+<script>
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible') })
+}, {threshold:.1})
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
+
+// Animated counters
+function animateCount(el, target, prefix='', suffix='', duration=2000) {
+  let start = 0
+  const step = target / (duration / 16)
+  const timer = setInterval(() => {
+    start += step
+    if(start >= target) { start = target; clearInterval(timer) }
+    el.textContent = prefix + Math.floor(start).toLocaleString() + suffix
+  }, 16)
+}
+
+const statsObserver = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting) {
+      animateCount(document.getElementById('s1'), 847)
+      animateCount(document.getElementById('s2'), 124000, '$')
+      statsObserver.disconnect()
+    }
+  })
+}, {threshold:.5})
+statsObserver.observe(document.querySelector('.stats-bar'))
+
+// Live feed rotation
+const feedItems = [
+  {icon:'🔒', name:'Valorant Points Trade', id:'ESC-F3A1', time:'just now', amount:'0.012 ETH', status:'FUNDED', cls:'st-funded', color:'green'},
+  {icon:'✅', name:'PayPal Balance Swap', id:'ESC-B22C', time:'4 min ago', amount:'80 USDT', status:'RELEASED', cls:'st-done', color:'blue'},
+  {icon:'⚡', name:'Fortnite Account', id:'ESC-D91E', time:'7 min ago', amount:'0.001 BTC', status:'PENDING', cls:'st-pending', color:'#fbbf24'},
+  {icon:'🔒', name:'YouTube Channel Sale', id:'ESC-A44F', time:'15 min ago', amount:'200 USDC', status:'FUNDED', cls:'st-funded', color:'green'},
+]
+
+let fi = 0
+setInterval(() => {
+  const feed = document.querySelector('.feed-item')
+  if(!feed) return
+  const d = feedItems[fi % feedItems.length]
+  fi++
+  const newItem = document.createElement('div')
+  newItem.className = 'feed-item'
+  newItem.innerHTML = `
+    <div class="feed-left">
+      <div class="feed-icon">${d.icon}</div>
+      <div>
+        <div class="feed-name">${d.name}</div>
+        <div class="feed-meta">${d.id} · ${d.time}</div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="feed-amount" style="color:${d.color === 'green' ? 'var(--green)' : d.color === 'blue' ? '#60a5fa' : d.color}">${d.amount}</div>
+      <div class="status-tag ${d.cls}" style="margin-top:4px">${d.status}</div>
+    </div>`
+  feed.parentNode.insertBefore(newItem, feed)
+  feed.parentNode.removeChild(feed.parentNode.children[feed.parentNode.children.length - 1])
+}, 3500)
+</script>
+</body>
+</html>
