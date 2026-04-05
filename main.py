@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from wallet import WalletService
 from escrow import EscrowService
@@ -59,6 +59,8 @@ async def _notify(event: str, deal: dict):
     except Exception as e:
         print(f"[NOTIFY] {event} failed: {e}")
 
+# ── MODELS ────────────────────────────────────────────────────────────────────
+
 class CreateDealRequest(BaseModel):
     title: str
     amount: float
@@ -88,6 +90,8 @@ class RegisterUserRequest(BaseModel):
     payout_address: str
     currency: str
 
+# ── DEAL ROUTES ───────────────────────────────────────────────────────────────
+
 @app.post("/deals/create")
 async def create_deal(req: CreateDealRequest):
     currency = req.currency.upper()
@@ -110,6 +114,12 @@ async def create_deal(req: CreateDealRequest):
     return {"success": True, "deal_id": deal_id, "deposit_address": escrow_wallet["address"],
             "amount_expected": req.amount, "currency": currency, "status": "PENDING_FUNDING"}
 
+@app.get("/deals")
+async def list_deals(email: Optional[str] = None, discord_id: Optional[str] = None):
+    if discord_id:
+        return db.get_deals_by_discord_id(discord_id)
+    return db.list_deals(email)
+
 @app.get("/deals/{deal_id}")
 async def get_deal(deal_id: str):
     deal = db.get_deal(deal_id)
@@ -117,12 +127,6 @@ async def get_deal(deal_id: str):
         raise HTTPException(404, "Deal not found")
     deal["current_balance"] = await wallet_svc.get_balance(deal["escrow_address"], deal["currency"])
     return deal
-
-@app.get("/deals")
-async def list_deals(email: Optional[str] = None, discord_id: Optional[str] = None):
-    if discord_id:
-        return db.get_deals_by_discord_id(discord_id)
-    return db.list_deals(email)
 
 @app.post("/deals/confirm-funding")
 async def confirm_funding(req: FundDealRequest):
@@ -168,6 +172,8 @@ async def raise_dispute(req: DisputeRequest):
     await _notify("disputed", db.get_deal(req.deal_id))
     return {"success": True, "deal_id": req.deal_id, "status": "DISPUTED"}
 
+# ── USER ROUTES ───────────────────────────────────────────────────────────────
+
 @app.post("/users/register")
 async def register_user(req: RegisterUserRequest):
     currency = req.currency.upper()
@@ -194,43 +200,32 @@ async def tatum_webhook(request: Request):
         await _notify("funded", db.get_deal(deal["deal_id"]))
     return {"received": True}
 
-@app.get("/")
-async def root():
-    index = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index):
-        return FileResponse(index)
-    return {"service": "HalalMM Escrow", "version": "2.0.0", "docs": "/docs"}
-
-@app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
-    index = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index):
-        return FileResponse(index)
-    raise HTTPException(404, "Not found")
-
-# ── ADMIN ──────────────────────────────────────────────────────────────────────
-from fastapi.responses import HTMLResponse
+# ── ADMIN ROUTES ──────────────────────────────────────────────────────────────
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
 def check_admin(request: Request):
-    auth = request.headers.get("X-Admin-Password", "")
-    if auth != ADMIN_PASSWORD:
+    if request.headers.get("X-Admin-Password", "") != ADMIN_PASSWORD:
         raise HTTPException(401, "Unauthorized")
 
+@app.get("/admin")
+async def admin_page():
+    f = os.path.join(STATIC_DIR, "admin.html")
+    if os.path.exists(f):
+        return FileResponse(f)
+    raise HTTPException(404, "Admin page not found")
+
 @app.get("/admin/data")
-async def admin_list_deals(request: Request):
+async def admin_data(request: Request):
     check_admin(request)
     return db._read()
 
 @app.patch("/admin/deals/{deal_id}")
 async def admin_edit_deal(deal_id: str, request: Request):
     check_admin(request)
-    deal = db.get_deal(deal_id)
-    if not deal:
+    if not db.get_deal(deal_id):
         raise HTTPException(404, "Deal not found")
-    updates = await request.json()
-    db.update_deal(deal_id, updates)
+    db.update_deal(deal_id, await request.json())
     return db.get_deal(deal_id)
 
 @app.delete("/admin/deals/{deal_id}")
@@ -253,9 +248,18 @@ async def admin_delete_user(discord_id: str, request: Request):
     db._write(data)
     return {"deleted": discord_id}
 
-@app.get("/admin")
-async def admin_page():
-    admin_file = os.path.join(STATIC_DIR, "admin.html")
-    if os.path.exists(admin_file):
-        return FileResponse(admin_file)
-    raise HTTPException(404, "Admin page not found")
+# ── FRONTEND ──────────────────────────────────────────────────────────────────
+
+@app.get("/")
+async def root():
+    index = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index):
+        return FileResponse(index)
+    return {"service": "HalalMM Escrow", "version": "2.0.0", "docs": "/docs"}
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    index = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index):
+        return FileResponse(index)
+    raise HTTPException(404, "Not found")
