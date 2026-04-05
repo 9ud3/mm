@@ -207,3 +207,55 @@ async def serve_spa(full_path: str):
     if os.path.exists(index):
         return FileResponse(index)
     raise HTTPException(404, "Not found")
+
+# ── ADMIN ──────────────────────────────────────────────────────────────────────
+from fastapi.responses import HTMLResponse
+
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
+def check_admin(request: Request):
+    auth = request.headers.get("X-Admin-Password", "")
+    if auth != ADMIN_PASSWORD:
+        raise HTTPException(401, "Unauthorized")
+
+@app.get("/admin/data")
+async def admin_list_deals(request: Request):
+    check_admin(request)
+    return db._read()
+
+@app.patch("/admin/deals/{deal_id}")
+async def admin_edit_deal(deal_id: str, request: Request):
+    check_admin(request)
+    deal = db.get_deal(deal_id)
+    if not deal:
+        raise HTTPException(404, "Deal not found")
+    updates = await request.json()
+    db.update_deal(deal_id, updates)
+    return db.get_deal(deal_id)
+
+@app.delete("/admin/deals/{deal_id}")
+async def admin_delete_deal(deal_id: str, request: Request):
+    check_admin(request)
+    data = db._read()
+    if deal_id not in data["deals"]:
+        raise HTTPException(404, "Deal not found")
+    del data["deals"][deal_id]
+    db._write(data)
+    return {"deleted": deal_id}
+
+@app.delete("/admin/users/{discord_id}")
+async def admin_delete_user(discord_id: str, request: Request):
+    check_admin(request)
+    data = db._read()
+    if discord_id not in data.get("discord_users", {}):
+        raise HTTPException(404, "User not found")
+    del data["discord_users"][discord_id]
+    db._write(data)
+    return {"deleted": discord_id}
+
+@app.get("/admin")
+async def admin_page():
+    admin_file = os.path.join(STATIC_DIR, "admin.html")
+    if os.path.exists(admin_file):
+        return FileResponse(admin_file)
+    raise HTTPException(404, "Admin page not found")
