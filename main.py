@@ -29,11 +29,25 @@ def _get_bot():
             pass
     return _bot_module
 
+async def _keep_alive():
+    import httpx
+    url = os.getenv("FRONTEND_URL", "http://localhost:8000")
+    await asyncio.sleep(60)
+    while True:
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.get(f"{url}/", timeout=10)
+            print("[KEEPALIVE] Pinged self")
+        except Exception as e:
+            print(f"[KEEPALIVE] Failed: {e}")
+        await asyncio.sleep(300)
+
 @asynccontextmanager
 async def lifespan(app):
     bot = _get_bot()
     if bot and os.getenv("DISCORD_BOT_TOKEN"):
         asyncio.create_task(bot.start_bot())
+    asyncio.create_task(_keep_alive())
     yield
 
 app = FastAPI(title="HalalMM Escrow API", version="2.0.0", lifespan=lifespan)
@@ -252,10 +266,17 @@ async def admin_delete_user(discord_id: str, request: Request):
 
 @app.get("/")
 async def root():
+    landing = os.path.join(STATIC_DIR, "landing.html")
+    if os.path.exists(landing):
+        return FileResponse(landing)
+    return {"service": "FedMM Escrow", "version": "2.0.0", "docs": "/docs"}
+
+@app.get("/dashboard")
+async def dashboard():
     index = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index):
         return FileResponse(index)
-    return {"service": "HalalMM Escrow", "version": "2.0.0", "docs": "/docs"}
+    raise HTTPException(404, "Not found")
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
