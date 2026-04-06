@@ -266,17 +266,10 @@ async def admin_delete_user(discord_id: str, request: Request):
 
 @app.get("/")
 async def root():
-    landing = os.path.join(STATIC_DIR, "landing.html")
-    if os.path.exists(landing):
-        return FileResponse(landing)
-    return {"service": "FedMM Escrow", "version": "2.0.0", "docs": "/docs"}
-
-@app.get("/dashboard")
-async def dashboard():
     index = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index):
         return FileResponse(index)
-    raise HTTPException(404, "Not found")
+    return {"service": "FedMM Escrow", "version": "2.0.0", "docs": "/docs"}
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):
